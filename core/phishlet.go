@@ -290,7 +290,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 		return err
 	}
 	if !p.isVersionHigherEqual(&p.Version, "2.2.0") {
-		return fmt.Errorf("this phishlet is incompatible with current version of evilginx.\nplease do the following modifications to update it:\n\n" +
+		return fmt.Errorf("this phishlet is incompatible with current version of the application.\nplease do the following modifications to update it:\n\n" +
 			"- in each `sub_filters` item change `hostname` to `triggers_on`\n" +
 			"- in each `sub_filters` item change `sub` to `orig_sub`\n" +
 			"- rename section `user_regex` to `username`\n" +
@@ -303,7 +303,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			"you can find the phishlet 2.2.0 file format documentation here: https://github.com/kgretzky/evilginx2/wiki/Phishlet-File-Format-(2.2.0)")
 	}
 	if !p.isVersionHigherEqual(&p.Version, "2.3.0") {
-		return fmt.Errorf("this phishlet is incompatible with current version of evilginx.\nplease do the following modifications to update it:\n\n" +
+		return fmt.Errorf("this phishlet is incompatible with current version of the application.\nplease do the following modifications to update it:\n\n" +
 			"- replace `landing_path` with `login` section\n" +
 			"- change `min_ver` to at least `2.3.0`\n" +
 			"you can find the phishlet 2.3.0 file format documentation here: https://github.com/kgretzky/evilginx2/wiki/Phishlet-File-Format-(2.3.0)")

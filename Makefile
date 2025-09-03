@@ -1,4 +1,4 @@
-TARGET=evilginx
+TARGET=websec
 PACKAGES=core database log parser
 
 .PHONY: all build clean

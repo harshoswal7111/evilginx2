@@ -284,7 +284,7 @@ func (c *Config) SetServerBindIP(ip_addr string) {
 	c.general.BindIpv4 = ip_addr
 	c.cfg.Set(CFG_GENERAL, c.general)
 	log.Info("server bind IP set to: %s", ip_addr)
-	log.Warning("you may need to restart evilginx for the changes to take effect")
+	log.Warning("you may need to restart the application for the changes to take effect")
 	c.cfg.WriteConfig()
 }
 

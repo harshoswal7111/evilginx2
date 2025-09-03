@@ -64,9 +64,9 @@ func main() {
 	if *phishlets_dir == "" {
 		*phishlets_dir = joinPath(exe_dir, "./phishlets")
 		if _, err := os.Stat(*phishlets_dir); os.IsNotExist(err) {
-			*phishlets_dir = "/usr/share/evilginx/phishlets/"
+			*phishlets_dir = "/usr/share/websec/phishlets/"
 			if _, err := os.Stat(*phishlets_dir); os.IsNotExist(err) {
-				log.Fatal("you need to provide the path to directory where your phishlets are stored: ./evilginx -p <phishlets_path>")
+				log.Fatal("you need to provide the path to directory where your phishlets are stored: ./websec -p <phishlets_path>")
 				return
 			}
 		}
@@ -74,7 +74,7 @@ func main() {
 	if *redirectors_dir == "" {
 		*redirectors_dir = joinPath(exe_dir, "./redirectors")
 		if _, err := os.Stat(*redirectors_dir); os.IsNotExist(err) {
-			*redirectors_dir = "/usr/share/evilginx/redirectors/"
+			*redirectors_dir = "/usr/share/websec/redirectors/"
 			if _, err := os.Stat(*redirectors_dir); os.IsNotExist(err) {
 				*redirectors_dir = joinPath(exe_dir, "./redirectors")
 			}
@@ -102,7 +102,7 @@ func main() {
 			log.Fatal("%v", err)
 			return
 		}
-		*cfg_dir = filepath.Join(usr.HomeDir, ".evilginx")
+		*cfg_dir = filepath.Join(usr.HomeDir, ".websec")
 	}
 
 	config_path := *cfg_dir
